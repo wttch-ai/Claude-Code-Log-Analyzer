@@ -5,10 +5,14 @@
 ## 功能
 
 - **全量 / 增量扫描**：首次全量解析全部 jsonl；之后按 `mtime+size` 指纹跳过未变文件，`row_uuid` 主键去重，重解析后清理过期行。
+- **定时自动扫描**：启动时增量扫一次，之后每 1 小时自动增量扫描（间隔可配），新会话自动入库。
 - **token 归因**：Skill → 其后续 Agent 及子会话全部往返，一并归入该 skill 桶（`rollup_bucket`），保证每个 token 可归桶。
 - **子会话嵌套**：subagent 挂在主时间轴 Agent tool_use 节点下，支持多级递归；统计含子会话，未丢失。
 - **多维堆叠图**：按天 × project / skill / tool / model；>12 系列自动并入 Other。
-- **对话时间轴**：按天分组，TokenBar 四档堆叠（input / cache_read / cache_creation / output），>200k 告警、>1M 红标；上下文压缩（compact_boundary）标记 pre→post 与丢弃 token。
+- **输入 / 输出 / Cache 三分类**：所有 token 展示处统一口径——输入、输出、Cache（= cache_read + cache_creation 合并），hover 再拆读 / 写缓存明细。
+- **按天三档堆叠图**：概览与会话页均有「按天 · 输入 / 输出 / Cache」堆叠图，随日期过滤联动。
+- **对话时间轴图表**：横向按时间展示每次交互的 token 堆叠；启动 subagent 时其交互并排显示（▸ 前缀缩进），点击柱子直达消息详情。
+- **对话时间轴**：按天分组，TokenBar 三分类堆叠（输入 / 输出 / Cache），>200k 告警、>1M 红标；上下文压缩（compact_boundary）标记 pre→post 与丢弃 token。
 - **消息详情抽屉**：回复文本 / 思考 / 工具输入输出（含 tool-results 落盘文件按需读取）/ 用量明细 / 子会话引用。
 - **价格可配置**：按 model 单价（USD / 1M tokens），精确匹配 → `*` 兜底；全局切换 token 数量或预估价格显示（前端不重取数）。
 
@@ -73,6 +77,7 @@ npm run dev
 ```
 set CLAUDE_PROJECTS_DIR=D:\path\to\projects
 set CLAUDE_LOG_DB=E:\path\to\analyzer.db
+set AUTO_SCAN_INTERVAL_S=3600      # 定时自动增量扫描间隔（秒），0 = 关闭
 ```
 
 ## 日志格式要点
@@ -96,6 +101,7 @@ set CLAUDE_LOG_DB=E:\path\to\analyzer.db
 | `GET /scan/latest` | 最近扫描状态（前端轮询 3s） |
 | `GET /overview` | 总量/今日/本周、cache_read 占比、按模型分布 + 成本占比 |
 | `GET /aggregate?dim=skill\|tool\|project\|model&granularity=day\|week&start&end&project&session` | 通用堆叠聚合，dates + series[]（>12 并入 Other） |
+| `GET /tiers?granularity=day\|week&start&end&project&session` | 按天/周 token 档位聚合：input / cache_read / cache_creation / output 各自独立 series（tokens + price），前端合并为三分类 |
 | `GET /projects?sort=tokens\|price\|sessions\|messages&order=` | 项目列表 |
 | `GET /projects/{id}` / `/projects/{id}/sessions` | 项目详情 / 会话列表 |
 | `GET /sessions/{sid}/timeline` | 完整时间轴（含子会话嵌套树） |

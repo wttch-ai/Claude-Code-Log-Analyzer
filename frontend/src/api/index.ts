@@ -8,6 +8,7 @@ import type {
   ProjectList,
   ScanStatus,
   SessionItem,
+  TierSeriesResult,
   TimelineData,
 } from '@/types'
 
@@ -30,6 +31,9 @@ export const api = {
   overview: () => http.get<OverviewData>('/overview').then((r) => r.data),
   aggregate: (params: AggregateParams) =>
     http.get<AggregateResult>('/aggregate', { params }).then((r) => r.data),
+
+  tiers: (params: { granularity?: 'day' | 'week'; start?: string; end?: string; project?: number; session?: string } = {}) =>
+    http.get<TierSeriesResult>('/tiers', { params }).then((r) => r.data),
 
   projects: (params: { sort?: string; order?: string; offset?: number; limit?: number } = {}) =>
     http.get<ProjectList>('/projects', { params }).then((r) => r.data),

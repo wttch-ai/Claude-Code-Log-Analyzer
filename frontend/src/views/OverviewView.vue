@@ -25,6 +25,11 @@
       @update:range="(s, e) => { start = s; end = e; loadCharts() }"
     />
 
+    <el-card v-loading="loading" class="chart-card tier-card">
+      <template #header>按天 · 输入 / 输出 / Cache（堆叠）</template>
+      <TierStackedChart v-if="tiers" :data="tiers" height="340px" />
+    </el-card>
+
     <div class="charts">
       <el-card v-loading="loading" class="chart-card">
         <template #header>按天 × 项目（堆叠）</template>
@@ -69,22 +74,25 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { api } from '@/api'
-import type { AggregateResult, OverviewData, TokenCounts } from '@/types'
+import type { AggregateResult, OverviewData, TierSeriesResult, TokenCounts } from '@/types'
 import DateFilterBar from '@/components/common/DateFilterBar.vue'
 import StackedBarChart from '@/components/common/StackedBarChart.vue'
+import TierStackedChart from '@/components/common/TierStackedChart.vue'
 import StatCard from '@/components/common/StatCard.vue'
 import { fmtCompact, fmtPrice, fmtTokens, pct } from '@/utils/format'
 
 const o = ref<OverviewData>({} as OverviewData)
 const byProject = ref<AggregateResult>()
 const bySkill = ref<AggregateResult>()
+const tiers = ref<TierSeriesResult>()
 const start = ref<string>()
 const end = ref<string>()
 const loading = ref(false)
 
 function tokensSub(t?: TokenCounts): string {
   if (!t) return ''
-  return `in ${fmtCompact(t.input)} · cr ${fmtCompact(t.cache_read)} · cc ${fmtCompact(t.cache_creation)} · out ${fmtCompact(t.output)}`
+  const cache = t.cache_read + t.cache_creation
+  return `输入 ${fmtCompact(t.input)} · 输出 ${fmtCompact(t.output)} · Cache ${fmtCompact(cache)}`
 }
 
 async function loadOverview() {
@@ -98,12 +106,14 @@ async function loadOverview() {
 async function loadCharts() {
   loading.value = true
   try {
-    const [p, s] = await Promise.all([
+    const [p, s, t] = await Promise.all([
       api.aggregate({ dim: 'project', start: start.value, end: end.value }),
       api.aggregate({ dim: 'skill', start: start.value, end: end.value }),
+      api.tiers({ granularity: 'day', start: start.value, end: end.value }),
     ])
     byProject.value = p
     bySkill.value = s
+    tiers.value = t
   } finally {
     loading.value = false
   }

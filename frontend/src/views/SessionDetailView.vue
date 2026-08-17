@@ -26,6 +26,21 @@
 
       <SessionChartCard :session-id="tl.session_id" />
 
+      <el-card v-loading="loading">
+        <template #header>按天 · 输入 / 输出 / Cache（堆叠）</template>
+        <TierStackedChart v-if="tiers" :data="tiers" height="300px" />
+      </el-card>
+
+      <el-card v-if="tl">
+        <template #header>
+          <div class="head">
+            <span>对话时间轴 · 每次交互 token（▸ = subagent 并排）</span>
+            <span class="hint">点击柱子查看消息详情</span>
+          </div>
+        </template>
+        <ConversationTokenChart :nodes="tl.nodes" height="320px" @show-detail="openDetail" />
+      </el-card>
+
       <el-card>
         <template #header>
           <div class="head">
@@ -59,10 +74,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
-import type { TimelineData, TimelineNode } from '@/types'
+import type { TierSeriesResult, TimelineData, TimelineNode } from '@/types'
 import MessageDetailDrawer from '@/components/session/MessageDetailDrawer.vue'
 import MessageRow from '@/components/session/MessageRow.vue'
 import SessionChartCard from '@/components/session/SessionChartCard.vue'
+import ConversationTokenChart from '@/components/session/ConversationTokenChart.vue'
+import TierStackedChart from '@/components/common/TierStackedChart.vue'
 import CompactionMarker from '@/components/session/CompactionMarker.vue'
 import StatCard from '@/components/common/StatCard.vue'
 import { fmtCompact, fmtPrice, fmtTime } from '@/utils/format'
@@ -73,6 +90,7 @@ const router = useRouter()
 const display = useDisplayStore()
 
 const tl = ref<TimelineData>()
+const tiers = ref<TierSeriesResult>()
 const loading = ref(true)
 const drawerVisible = ref(false)
 const currentRowUuid = ref<string | null>(null)
@@ -146,7 +164,13 @@ function openDetail(rowUuid: string) {
 
 onMounted(async () => {
   try {
-    tl.value = await api.timeline(String(route.params.sessionId))
+    const sid = String(route.params.sessionId)
+    const [t, tr] = await Promise.all([
+      api.timeline(sid),
+      api.tiers({ granularity: 'day', session: sid }),
+    ])
+    tl.value = t
+    tiers.value = tr
   } finally {
     loading.value = false
   }

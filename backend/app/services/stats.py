@@ -264,6 +264,103 @@ def aggregate(
     }
 
 
+# ---------------------------------------------------------------- tiers
+
+def tier_series(
+    db: Session,
+    granularity: str,
+    start: str | None = None,
+    end: str | None = None,
+    project_id: int | None = None,
+    session_id: str | None = None,
+) -> dict:
+    """按天/周聚合各 token 档位（input / cache_read / cache_creation / output）。
+
+    每档独立 series（含 tokens 与 price），前端按「输入 / 输出 / Cache」三分类合并展示，
+    亦可拆细。与 aggregate 不同：这里维度即档位，不含 skill/tool 等归因桶。
+    """
+    if granularity == "week":
+        date_expr = func.strftime("%G-W%V", Message.day_local)
+    else:
+        date_expr = Message.day_local
+
+    q = (
+        db.query(
+            date_expr.label("d"),
+            Message.model,
+            func.sum(Message.input_tokens),
+            func.sum(Message.cache_read_tokens),
+            func.sum(Message.cache_creation_tokens),
+            func.sum(Message.output_tokens),
+        )
+        .group_by("d", Message.model)
+        .order_by("d")
+    )
+    if start:
+        q = q.filter(Message.day_local >= start)
+    if end:
+        q = q.filter(Message.day_local <= end)
+    if project_id:
+        q = q.filter(Message.project_id == project_id)
+    if session_id:
+        q = q.filter(Message.session_id == session_id)
+
+    tiers = ("input", "cache_read", "cache_creation", "output")
+    pt = PriceTable.load(db)
+    # d -> tier -> {"tokens": int, "price": float}
+    acc: dict[str, dict[str, dict]] = {}
+    for d, model, inp, cr, cc, out in q.all():
+        toks = _tokens_dict(inp, cr, cc, out)
+        day = acc.setdefault(d, {t: {"tokens": 0, "price": 0.0} for t in tiers})
+        cost = pt.cost(model, toks)
+        bd = cost["breakdown"] or {t: 0.0 for t in tiers}
+        for t in tiers:
+            day[t]["tokens"] += toks[t]
+            if cost["priced"]:
+                day[t]["price"] += bd.get(t, 0.0)
+
+    # 日期序列（day 粒度补全连续天）
+    dates = sorted(acc)
+    if granularity == "day" and dates and len(dates) < 370:
+        d0 = date.fromisoformat(dates[0])
+        d1 = date.fromisoformat(dates[-1])
+        full = []
+        d = d0
+        while d <= d1 and len(full) < 370:
+            full.append(d.isoformat())
+            d += timedelta(days=1)
+        dates = full
+
+    series = []
+    for t in tiers:
+        series.append(
+            {
+                "name": t,
+                "values": [
+                    {"tokens": 0, "price": 0.0}
+                    if d not in acc or t not in acc[d]
+                    else {
+                        "tokens": acc[d][t]["tokens"],
+                        "price": round(acc[d][t]["price"], 6),
+                    }
+                    for d in dates
+                ],
+                "total_tokens": sum(acc.get(d, {}).get(t, {"tokens": 0})["tokens"] for d in dates),
+                "total_price": round(sum(acc.get(d, {}).get(t, {"price": 0.0})["price"] for d in dates), 6),
+            }
+        )
+
+    total_tokens = sum(s["total_tokens"] for s in series)
+    total_price = sum(s["total_price"] for s in series)
+    return {
+        "granularity": granularity,
+        "dates": dates,
+        "series": series,
+        "total_tokens": total_tokens,
+        "total_price": round(total_price, 6),
+    }
+
+
 # ---------------------------------------------------------------- projects
 
 def project_list(

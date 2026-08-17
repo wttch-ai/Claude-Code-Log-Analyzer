@@ -2,10 +2,13 @@
   <el-tooltip placement="top" :disabled="!tokens" :show-after="200">
     <template #content>
       <div class="tbar-tip">
-        <div v-for="t of TIERS" :key="t" class="tbar-tip-line">
-          <span class="swatch" :style="{ background: TOKEN_TIER_COLORS[t] }" />
-          <span class="tier-name">{{ TOKEN_TIER_LABELS[t] }}</span>
-          <b>{{ fmtCompact(tokens[t]) }}</b>
+        <div v-for="t of TIERS3" :key="t" class="tbar-tip-line">
+          <span class="swatch" :style="{ background: TIER3_COLORS[t] }" />
+          <span class="tier-name">{{ TIER3_LABELS[t] }}</span>
+          <b>{{ fmtCompact(three(t)) }}</b>
+        </div>
+        <div v-if="tokens.cache_read + tokens.cache_creation > 0" class="tbar-tip-sub">
+          <span class="tier-name">　└ 读 {{ fmtCompact(tokens.cache_read) }} · 写 {{ fmtCompact(tokens.cache_creation) }}</span>
         </div>
         <div class="tbar-tip-line total">
           <span>合计</span>
@@ -15,11 +18,11 @@
     </template>
     <div class="tbar" :style="{ height: barHeight + 'px' }">
       <div
-        v-for="t of TIERS"
-        v-show="tokens[t] > 0"
+        v-for="t of TIERS3"
+        v-show="three(t) > 0"
         :key="t"
         class="tbar-seg"
-        :style="{ width: pct(tokens[t] / tokens.total) + '%', background: TOKEN_TIER_COLORS[t] }"
+        :style="{ width: pct(three(t) / tokens.total) + '%', background: TIER3_COLORS[t] }"
       />
     </div>
   </el-tooltip>
@@ -28,15 +31,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TokenCounts } from '@/types'
-import { TOKEN_TIER_COLORS, TOKEN_TIER_LABELS } from '@/utils/charts'
 import { fmtCompact } from '@/utils/format'
+import { TIER3_COLORS, TIER3_KEYS, TIER3_LABELS, type TierKey } from '@/utils/tiers'
 
 const props = withDefaults(
   defineProps<{ tokens?: TokenCounts }>(),
   { tokens: () => ({ input: 0, cache_read: 0, cache_creation: 0, output: 0, total: 0 }) },
 )
 
-const TIERS = ['input', 'cache_read', 'cache_creation', 'output'] as const
+const TIERS3 = TIER3_KEYS
+
+// 三分类取值：cache = cache_read + cache_creation
+function three(t: TierKey): number {
+  const tk = props.tokens
+  if (t === 'cache') return tk.cache_read + tk.cache_creation
+  return tk[t]
+}
 
 const barHeight = computed(() => {
   const total = props.tokens?.total ?? 0
@@ -67,6 +77,7 @@ function pct(x: number): number {
 .tbar-tip { font-size: 12px; line-height: 1.7; min-width: 150px; }
 .tbar-tip-line { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
 .tbar-tip-line b { font-variant-numeric: tabular-nums; }
+.tbar-tip-sub { display: flex; font-size: 11px; color: #888; padding-left: 4px; }
 .tbar-tip-line.total { margin-top: 4px; padding-top: 4px; border-top: 1px solid #ddd; }
 .swatch { width: 10px; height: 10px; border-radius: 2px; }
 .tier-name { flex: 1; }

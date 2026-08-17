@@ -19,6 +19,11 @@ TZ_NAME = "local"
 # 启动时是否后台自动增量扫描
 SCAN_ON_STARTUP = True
 
+# 定时自动增量扫描间隔（秒，可用环境变量 AUTO_SCAN_INTERVAL_S 覆盖；0 = 关闭）
+AUTO_SCAN_INTERVAL_S = int(
+    __import__("os").environ.get("AUTO_SCAN_INTERVAL_S", "3600")
+)
+
 # 时间轴预览截断长度
 PREVIEW_LEN = 2000
 # 详情接口读取 tool-results 落盘文件上限

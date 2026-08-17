@@ -13,6 +13,8 @@ export interface PriceInfo {
   total: number | null
   priced: boolean
   currency?: string | null
+  // 四档价格细分（timeline 节点 / tiers 聚合携带；其余场景可为空）
+  breakdown?: { input: number; cache_read: number; cache_creation: number; output: number } | null
 }
 
 export interface SeriesCell {
@@ -32,6 +34,22 @@ export interface AggregateResult {
   granularity: string
   dates: string[]
   series: AggSeries[]
+  total_tokens: number
+  total_price: number
+}
+
+// 按天/周 token 档位聚合（input / cache_read / cache_creation / output）
+export interface TierSeriesResult {
+  granularity: string
+  dates: string[]
+  series: TierSeries[]
+  total_tokens: number
+  total_price: number
+}
+
+export interface TierSeries {
+  name: string
+  values: SeriesCell[]
   total_tokens: number
   total_price: number
 }

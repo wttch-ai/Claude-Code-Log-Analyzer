@@ -1,0 +1,29 @@
+# ---- Python ----
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 数据库（由扫描生成，不入库）
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+
+# ---- Node ----
+frontend/node_modules/
+frontend/dist/
+*.local
+
+# TypeScript 构建缓存
+*.tsbuildinfo
+
+# ---- IDE / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 本地环境变量
+.env
+.env.*
